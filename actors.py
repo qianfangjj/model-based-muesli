@@ -200,12 +200,6 @@ class Actor(Logger):
       error = 0
       game.history.errors.append(error)
 
-      # print(f"\n policy_logits_type: {initial_inference.policy_logits[0]}")
-      # print(f"\n value_type: {initial_inference.value}")
-      # print(f"\n value_item_type: {initial_inference.value.item()}")
-      # print(f"\n game.action_space: {game.action_space}")
-      # print(f"\n config.action_space: {self.config.action_space}")
-
       action, logits_results = self.config.select_action_with_logits(initial_inference.policy_logits[0], game.action_space, self.temperature)
       # action = self.config.select_action(root, self.temperature)
 

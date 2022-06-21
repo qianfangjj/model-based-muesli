@@ -40,6 +40,7 @@ class Learner(Logger):
     self.network.to(self.device)
     self.network.train()
 
+    # target network initialize
     initial_weights = self.network.get_weights()
     self.target_network = get_network(config, self.device)
     self.target_network.load_weights(initial_weights)
@@ -124,7 +125,6 @@ class Learner(Logger):
     self.throughput['time']['fps'] = time.time() 
     while ray.get(self.replay_buffer.size.remote()) < self.config.stored_before_train:
       time.sleep(1)
-      # print(f"\n buffer_size < 500")
 
     self.throughput['time']['ups'] = time.time() 
     while self.training_step < self.config.training_steps:
@@ -134,6 +134,7 @@ class Learner(Logger):
 
         batch = ray.get(ready_batches[0])
         # self.update_weights(batch)
+        # muesli 训练入口
         self.update_weights_muesli(batch)
         self.training_step += 1
         # soft update target network params
@@ -306,6 +307,7 @@ class Learner(Logger):
       exp_advs = torch.cat(exp_adv_list, dim=1)
       policy_cmpo = policy_logits_ * exp_advs / z_cmpo
       policy_cmpo = torch.softmax(policy_cmpo, dim=1)
+
       p_prior.append(policy_cmpo)
       # policy_logits_ = torch.softmax(policy_logits_, dim=1)
       # p_prior.append(policy_logits_)
@@ -390,8 +392,6 @@ class Learner(Logger):
       target_rewards = torch.from_numpy(target_rewards).to(self.device)
       is_weights = torch.from_numpy(is_weights).to(self.device)
       action_batch = torch.tensor(actions).long().to(self.device).unsqueeze(-1)
-      # print(f"\n action_batch: {action_batch.size()}")
-      # print(f"\n action_batch0: {action_batch[:, 0]}")
 
       init_value = self.config.inverse_value_transform(value) if not self.config.no_support else value
       new_errors = (init_value.squeeze() - target_values[:, 0]).cpu().numpy()
@@ -414,12 +414,10 @@ class Learner(Logger):
 
     reward_loss = 0
     value_loss = self.scalar_loss_fn(value.squeeze(), target_values[:, 0])
-    # policy_loss = self.policy_loss_fn(policy_logits.squeeze(), target_policies[:, 0])
     policy_gradient_loss = self.policy_gradient_loss(policy_logits, target_policies[:, 0], action_batch[:, 0], prior_adv)
     cmpo_loss = self.cmpo_loss(policy_logits, observations[:, 0])
 
     policy_loss = 0
-    # for i, action in enumerate(zip(*actions), 1):
     for i in range(1, action_batch.shape[1]):
       value, reward, policy_logits, hidden_state = self.network.recurrent_inference(hidden_state, action_batch[:, i-1])
       hidden_state.register_hook(lambda grad: grad * 0.5)
@@ -428,7 +426,6 @@ class Learner(Logger):
 
       value_loss += self.scalar_loss_fn(value.squeeze(), target_values[:, i])
 
-      # policy_loss += self.policy_loss_fn(policy_logits.squeeze(), target_policies[:, i])
       policy_loss += self.policy_loss_fn(policy_logits.squeeze(), prior_logits[i])
 
     reward_loss = (is_weights * reward_loss).mean()
