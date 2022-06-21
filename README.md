@@ -6,7 +6,16 @@
   * muesli在训练和测试时，直接使用policy输出的action，而不是通过mcts搜索
   * 涉及文件:
     * actor.py 
+    ```bash
+    97       # self.play_game(game)
+    98       self.play_game_use_policy(game)
+    ```
     * evaluate.py
+    ```bash
+    602   with torch.inference_mode():
+    603     # game = evaluator.play_game(environment)
+    604     game = evaluator.play_game_muesli(environment)
+    ```
 * 数据流修改:
   * policy_logits来源: child_visits -> policy net output
   * 增加oberservation: s_t,....,s_t+K
@@ -18,8 +27,29 @@
   * 增加policy gradient loss，cmpo loss
   * 文件:
     * learners.py
+    ```bash
+     135         batch = ray.get(ready_batches[0])
+     136         # self.update_weights(batch)
+     137         # muesli 训练入口
+     138         self.update_weights_muesli(batch)
+     139         self.training_step += 1
+     140         # soft update target network params
+     141         for target_param, param in zip(self.target_network.parameters(), self.network.parameters()):
+     142           target_param.data.copy_(
+     143             target_param.data * (1.0 - self.config.alpha_target) + param.data * self.config.alpha_target
+     144           )
+    ```
 * 配置增加:
   * config.py 增加muesli相关的超参配置项
+  ```bash
+  227   ### Muesli
+  228   muesli = parser.add_argument_group('muesli')
+  229   muesli.add_argument('--threshold_c', type=float, default=1.0)
+  230   muesli.add_argument('--simulation_depth', type=int, default=1)
+  231   muesli.add_argument('--clip_param', type=float, default=0.1)
+  232   muesli.add_argument('--num_sampled_actions', type=int, default=16)
+  233   muesli.add_argument('--alpha_target', type=float, default=0.1)
+  ```
 
 
 ## 实验
